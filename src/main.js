@@ -1,14 +1,21 @@
-// Main entry point - scenes are loaded via script tags in index.html
-// The scenes are already defined as global classes
+import Phaser from 'phaser';
+import { H, W } from './config.js';
+import { BootScene } from './scenes/BootScene.js';
+import { GameOverScene } from './scenes/GameOverScene.js';
+import { GameScene } from './scenes/GameScene.js';
+import { MenuScene } from './scenes/MenuScene.js';
 
-// Create the Phaser game instance
-const game = new Phaser.Game(gameConfig);
+// Entry point: a 1920x1080 canvas that scales to fit the browser window.
+const game = new Phaser.Game({
+  type: Phaser.AUTO,
+  parent: 'game',
+  width: W,
+  height: H,
+  backgroundColor: '#070b16',
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
+  render: { antialias: true, roundPixels: false },
+  disableContextMenu: true,
+  scene: [BootScene, MenuScene, GameScene, GameOverScene],
+});
 
-// Add scenes to the game
-game.scene.add('BootScene', BootScene);
-game.scene.add('MenuScene', MenuScene);
-game.scene.add('SetupScene', SetupScene);
-game.scene.add('GameScene', GameScene);
-
-// Start with the BootScene
-game.scene.start('BootScene');
+window.__phaser = game;

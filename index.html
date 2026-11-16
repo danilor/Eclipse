@@ -1,101 +1,28 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Eclipse: Second Dawn for the Galaxy</title>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Eclipse: Second Dawn for the Galaxy (offline)</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: #000;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            font-family: Arial, sans-serif;
-        }
-        
-        #game-container {
-            width: 100%;
-            height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        #loading-screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: #000;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-        }
-        
-        .logo {
-            color: #ffcc00;
-            font-size: 48px;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-        
-        .loading-bar {
-            width: 400px;
-            height: 20px;
-            border: 2px solid #fff;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        
-        .loading-progress {
-            height: 100%;
-            background-color: #ffcc00;
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-        
-        .loading-text {
-            color: #fff;
-            margin-top: 20px;
-            font-size: 18px;
-        }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #04060d;
+        overflow: hidden;
+      }
+      #game {
+        width: 100vw;
+        height: 100vh;
+      }
+      canvas {
+        display: block;
+      }
     </style>
-</head>
-<body>
-    <div id="game-container"></div>
-    
-    <div id="loading-screen">
-        <div class="logo">ECLIPSE</div>
-        <div class="loading-bar">
-            <div class="loading-progress" id="loading-progress"></div>
-        </div>
-        <div class="loading-text" id="loading-text">Loading game assets...</div>
-    </div>
-
-    <script>
-        // Show loading screen immediately
-        document.addEventListener('DOMContentLoaded', () => {
-            const loadingScreen = document.getElementById('loading-screen');
-            if (loadingScreen) {
-                loadingScreen.style.display = 'flex';
-            }
-        });
-    </script>
-
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
-    <script src="src/config.js"></script>
-    <script src="src/system/GameState.js"></script>
-    <script src="src/system/AIOpponent.js"></script>
-    <script src="src/scenes/BootScene.js"></script>
-    <script src="src/scenes/MenuScene.js"></script>
-    <script src="src/scenes/SetupScene.js"></script>
-    <script src="src/scenes/GameScene.js"></script>
-    <script src="src/main.js"></script>
-</body>
+  </head>
+  <body>
+    <div id="game"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
 </html>

@@ -1,24 +1,25 @@
 {
   "name": "eclipse-second-dawn",
-  "version": "1.0.0",
-  "description": "Eclipse: Second Dawn for the Galaxy - Phaser IO game",
-  "main": "src/main.js",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Offline 1v1 adaptation of the board game Eclipse: Second Dawn for the Galaxy, built with Phaser 3",
+  "type": "module",
   "scripts": {
-    "start": "npx serve .",
-    "dev": "npx serve . -l 3000",
-    "build": "echo 'Build complete'"
-  },
-  "keywords": [
-    "phaser",
-    "eclipse",
-    "strategy"
-  ],
-  "author": "",
-  "license": "MIT",
-  "devDependencies": {
-    "serve": "^14.2.0"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "simulate": "node tools/simulate.mjs",
+    "ui:smoke": "node tools/ui-smoke.mjs",
+    "ui:drive": "node tools/ui-drive.mjs"
   },
   "dependencies": {
-    "phaser": "^3.60.0"
+    "phaser": "^3.90.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.65.1",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
   }
 }
