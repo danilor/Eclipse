@@ -4,12 +4,15 @@
 // decision the engine can ask a human can actually be answered by clicking, and reports whatever cannot.
 //
 //   node tools/ui-drive.mjs [--seed=1] [--species=terran-federation] [--versus=planta] [--menu] [--speed=instant]
-//                           [--timeout=900] [--out=tmp/drive] [--resume=3] [--tour=0] [--hover=0] [--quirks=retreat,trade]
-//                           [--gl=swiftshader] [--url=...]
+//                           [--timeout=900] [--out=tmp/drive] [--resume=3] [--tour=0] [--tour-round=1] [--hover=0]
+//                           [--quirks=retreat,trade] [--docs=docs/screenshots] [--docs-round=6] [--gl=swiftshader] [--url=...]
 //
 //   --menu     start through the main menu (pick species, type the seed, press START GAME) instead of ?quick
 //   --resume=N at the first action prompt of round N go Menu -> "Continue saved game" and check the restored game
 //   --tour=0   skip the one-off tour of the top bar, the help, the tech tray and the opponent board
+//   --tour-round=N  do that tour at the first action prompt of round N instead of round 1
+//   --docs=DIR also save the README screenshots (stable file names, dialogs cropped to their frame) in DIR
+//   --docs-round=N  round of the mid-game overview screenshots of --docs (default 6)
 //   --hover=0  skip the mouse sweeps that trigger every tooltip
 //   --quirks   make the human seat prefer branches the AI rarely takes, so that their UI gets clicked too:
 //              retreat (retreat whenever a battle offers it) and trade (trade resources through the Trade dialog)
@@ -138,6 +141,17 @@ function installDriver() {
   };
   D.fit = () => window.__eclipse.view.fit(false, true);
 
+  // Page rectangle of an area given in game coordinates, and of the frame of the topmost dialog.
+  D.box = ({ x, y, width, height }) => {
+    const a = toClient(x, y);
+    const b = toClient(x + width, y + height);
+    return { x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y };
+  };
+  D.modalBox = () => {
+    const m = topModal(activeScene());
+    return m ? D.box({ x: (GW - m.w) / 2 - 4, y: (GH - m.h) / 2 - 4, width: m.w + 8, height: m.h + 8 }) : null;
+  };
+
   D.hits = () => {
     const scene = activeScene();
     const ptr = scene.input.activePointer;
@@ -168,6 +182,16 @@ function installDriver() {
     return e.presenter.submit(cmd);
   };
   D.closeModals = () => window.__eclipse?.presenter.closeModals();
+  D.info = () => {
+    const e = window.__eclipse;
+    return { tip: e.tipText ?? null, hover: e.hoverKey ?? null, title: norm(e.right.infoTitle.text), body: norm(e.right.infoBody.text) };
+  };
+  D.modalText = () => {
+    const parts = [];
+    const m = topModal(activeScene());
+    if (m) walk(m, (o) => typeof o.text === 'string' && shown(o) && parts.push(norm(o.text)));
+    return parts.join(' | ');
+  };
   D.stateJson = () => JSON.stringify(window.__eclipse.engine.state);
   D.finalJson = () => {
     const g = phaser().scene.getScene('GameOver').result.game;
@@ -190,7 +214,10 @@ const speed = args.speed ?? 'instant';
 const useMenu = !!args.menu;
 const resumeRound = args.resume ? Number(args.resume) : 0;
 const doTour = args.tour !== '0';
+const tourRound = Number(args['tour-round'] ?? 1);
 const doHover = args.hover !== '0';
+const docsDir = args.docs ? path.resolve(args.docs) : null;
+const docsRound = Number(args['docs-round'] ?? 6);
 const quirks = new Set((args.quirks ?? '').split(',').filter(Boolean));
 const timeout = Number(args.timeout ?? 900) * 1000;
 const out = path.resolve(args.out ?? 'tmp/drive');
@@ -253,15 +280,63 @@ async function waitFor(fn, ms = 4000, step = 30) {
   }
 }
 
+// README screenshots (--docs): driver shot name -> stable file name and the part to keep, which is the whole
+// canvas ('full'), the frame of the topmost dialog ('modal') or a rectangle of the 1920x1080 game area.
+// One shot can feed several files; each file is written once, from the first matching shot of the match.
+const AREA = {
+  board: { x: 0, y: 56, width: 430, height: 892 },
+  sidebar: { x: 1548, y: 56, width: 372, height: 892 },
+  prompt: { x: 0, y: 948, width: 1920, height: 132 },
+};
+const DOC_SHOTS = [
+  [/^menu-picked$/, 'menu', 'full'],
+  [/^overview-round-1$/, 'game-start', 'full'],
+  [/^overview-midgame$/, 'game-midgame', 'full'],
+  [/^overview-midgame$/, 'species-board', AREA.board],
+  [/^overview-midgame$/, 'sidebar', AREA.sidebar],
+  [/^overview-midgame$/, 'prompt-bar', AREA.prompt],
+  [/^hover-sector$/, 'sector-info', 'full'],
+  [/^colonize-mode$/, 'colony-ships', 'full'],
+  [/^place-sector-\d+-orientations$/, 'explore', 'full'],
+  [/^build-/, 'build', 'full'],
+  [/^move-destinations$/, 'move', 'full'],
+  [/^research-dialog$/, 'research', 'modal'],
+  [/^upgrade-part-picked$/, 'upgrade', 'modal'],
+  [/^trade-dialog$/, 'trade', 'modal'],
+  [/^dialog-discovery$/, 'discovery', 'modal'],
+  [/^dialog-engage$/, 'engage', 'modal'],
+  [/^battle-report$/, 'battle-summary', 'modal'],
+  [/^battle-report-round$/, 'battle-round', 'modal'],
+  [/^tour-tech-tray$/, 'tech-tray', 'modal'],
+  [/^tour-opponent-board$/, 'opponent-board', 'modal'],
+  [/^gameover$/, 'game-over', 'full'],
+];
+const docsDone = new Set();
+
+async function docShots(name, { keepMouse = false } = {}) {
+  const rules = DOC_SHOTS.filter(([re, file]) => re.test(name) && !docsDone.has(file));
+  if (!docsDir || !rules.length) return;
+  // Park the pointer in a corner so that no tooltip, hover highlight or info box ends up in the picture.
+  if (!keepMouse) await page.mouse.move(1919, 1079);
+  await settle();
+  fs.mkdirSync(docsDir, { recursive: true });
+  for (const [, file, area] of rules) {
+    docsDone.add(file);
+    const clip = area === 'full' ? null : area === 'modal' ? await page.evaluate(() => window.__drv.modalBox()) : await page.evaluate((r) => window.__drv.box(r), area);
+    await page.screenshot({ path: path.join(docsDir, `${file}.png`), ...(clip ? { clip } : {}) });
+  }
+}
+
 const shotsTaken = new Set();
-async function shot(name) {
+async function shot(name, opts) {
   await settle();
   await page.screenshot({ path: path.join(out, `${name}.png`) });
+  await docShots(name, opts);
 }
-async function shotOnce(name) {
+async function shotOnce(name, opts) {
   if (shotsTaken.has(name)) return;
   shotsTaken.add(name);
-  await shot(name);
+  await shot(name, opts);
 }
 
 let mirror = null;
@@ -621,15 +696,28 @@ async function humanStep(st, d) {
   for (const w of warns) warnings.push({ ...w, wanted: canon(cmd) });
 }
 
+// Pages through a whole battle report and leaves it on the round page with the most hits (the README picture).
+async function pageThroughReport() {
+  const find = async (re) => (await buttons('modal')).find((b) => re.test(b.text) && b.enabled);
+  const misses = [];
+  for (let b = await find(/^Next/); b && misses.length < 12; b = await find(/^Next/)) {
+    await clickAt(b.x, b.y);
+    misses.push(((await page.evaluate(() => window.__drv.modalText())).match(/No hits/g) ?? []).length);
+  }
+  for (let at = misses.length - 1; at > misses.indexOf(Math.min(...misses)); at--) {
+    const b = await find(/Previous/);
+    if (!b) break;
+    await clickAt(b.x, b.y);
+  }
+  await shotOnce('battle-report-round');
+}
+
 async function dismissModal(st) {
   const list = await buttons('modal');
   const next = list.find((b) => /^Next/.test(b.text) && b.enabled);
   if (next && reportsSeen < 3) {
     await shotOnce('battle-report');
-    await clickAt(next.x, next.y);
-    await shotOnce('battle-report-round');
-    const prev = (await buttons('modal')).find((b) => /Previous/.test(b.text) && b.enabled);
-    if (prev) await clickAt(prev.x, prev.y);
+    await pageThroughReport();
   }
   reportsSeen += 1;
   const cont = (await buttons('modal')).find((b) => /^(Continue|Close|X)$/.test(b.text));
@@ -680,6 +768,51 @@ async function tour() {
   const instant = (await buttons('scene')).find((x) => x.text === 'Instant');
   await clickAt(instant.x, instant.y);
   await shotOnce('tour-top-bar');
+}
+
+// Overview pictures for the README, at the first action prompt of round 1 and of --docs-round.
+async function docOverview(st) {
+  if (!docsDir) return;
+  if (st.round === 1 && !shotsTaken.has('overview-round-1')) {
+    await sleep(2200); // let the opening toasts fade
+    await shotOnce('overview-round-1');
+  }
+  if (st.round >= docsRound && !shotsTaken.has('overview-midgame')) {
+    await sleep(2200);
+    await shotOnce('overview-midgame');
+    await hoverSector(st);
+    await tradeShot(st);
+  }
+}
+
+// Opens the Trade dialog only to photograph it; nothing is traded.
+async function tradeShot(st) {
+  try {
+    await press('prompt', /^Trade resources$/);
+    await waitModal('Trade Resources');
+    await shotOnce('trade-dialog');
+    await press('modal', /^Close$/);
+  } catch (err) {
+    if (!(err instanceof Stuck)) throw err;
+    stuck.push({ n: stuck.length + 1, round: st.round, kind: 'trade-dialog', message: err.message, info: err.info });
+    await page.evaluate(() => window.__drv.closeModals());
+  }
+}
+
+// Pointer over the busiest sector of the human seat: the info box of the right-hand column describes it.
+async function hoverSector(st) {
+  const counts = {};
+  for (const s of mirror.state.ships) if (s.owner === st.human) counts[s.at] = (counts[s.at] ?? 0) + 1;
+  const key = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0];
+  const at = key && (await page.evaluate((k) => window.__drv.map(k), key));
+  if (!at?.inside || !at.visible) return;
+  await page.mouse.move(at.x, at.y);
+  await sleep(300);
+  // A tooltip left behind by a button that was rebuilt under the pointer would hide the sector description.
+  const info = await page.evaluate(() => window.__drv.info());
+  if (info.hover !== key || info.tip) problems.push(`[ui] pointer over sector ${key}, but the info box shows "${info.tip ?? info.title}"`);
+  await shotOnce('hover-sector', { keepMouse: true });
+  await page.mouse.move(1919, 1079);
 }
 
 async function resumeCheck() {
@@ -794,7 +927,8 @@ try {
     }
 
     if (d.kind === 'chooseAction' && st.modals.length === 0) {
-      if (!toured) {
+      await docOverview(st);
+      if (!toured && st.round >= tourRound) {
         toured = true;
         await tour();
         lastProgress = Date.now();

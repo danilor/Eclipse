@@ -27,7 +27,9 @@ export function tipArea(scene, modal, x, y, w, h, { size = 15, hint = 'Hover ove
   };
   const on = (str) => set(str);
   scene.events.on('tip', on);
-  modal.once('destroy', () => scene.events.off('tip', on));
+  // Children of a dialog are destroyed one by one, and one of them may still emit a 'tip' (see releaseTipOnDestroy),
+  // so the listener has to go as soon as its own text does.
+  text.once('destroy', () => scene.events.off('tip', on));
   return { set, text };
 }
 

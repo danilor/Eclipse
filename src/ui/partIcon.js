@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { COLORS, DIE_COLORS } from '../config.js';
 import { PARTS } from '../data/parts.js';
-import { label } from './kit.js';
+import { label, releaseTipOnDestroy } from './kit.js';
 import { describePart, signed } from './names.js';
 
 const GLYPHS = {
@@ -95,14 +95,18 @@ export class PartIcon extends Phaser.GameObjects.Container {
     this.num = label(scene, 0, 1, '', { size: Math.round(size * 0.36), bold: true, origin: [0.5, 0.5], color: '#05070d' });
     this.nrg = label(scene, size / 2 - 3, size / 2 - 2, '', { size: Math.round(size * 0.28), bold: true, origin: [1, 1], color: '#ff9d9d', stroke: '#05070d', thickness: 3 });
     this.hit = scene.add.rectangle(0, 0, size, size, 0xffffff, 0.001).setInteractive();
+    this.over = false;
     this.hit.on('pointerover', () => {
+      this.over = true;
       this.scene.events.emit('tip', this.tip);
       this.emit('over');
     });
     this.hit.on('pointerout', () => {
+      this.over = false;
       this.scene.events.emit('tip', null);
       this.emit('out');
     });
+    releaseTipOnDestroy(scene, this.hit, () => this.over);
     this.hit.on('pointerdown', (p) => this.emit('click', p));
     this.add([this.bg, this.glyph, this.num, this.nrg, this.hit]);
     scene.add.existing(this);

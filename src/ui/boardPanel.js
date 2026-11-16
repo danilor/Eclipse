@@ -40,6 +40,7 @@ export class BoardPanel {
     parent?.add(this.root);
     this.texts = {};
     this.build();
+    this.update();
   }
 
   get p() {

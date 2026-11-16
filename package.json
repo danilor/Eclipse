@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "simulate": "node tools/simulate.mjs",
     "ui:smoke": "node tools/ui-smoke.mjs",
-    "ui:drive": "node tools/ui-drive.mjs"
+    "ui:drive": "node tools/ui-drive.mjs",
+    "docs:screenshots": "node tools/ui-drive.mjs --menu --seed=18 --docs=docs/screenshots --docs-round=6 --tour-round=6 --hover=0 --out=tmp/docs-run"
   },
   "dependencies": {
     "phaser": "^3.90.0"

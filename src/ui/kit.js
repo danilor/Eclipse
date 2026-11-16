@@ -42,6 +42,14 @@ export function panelBox(scene, x, y, w, h, o = {}) {
   return drawBox(scene.add.graphics(), x, y, w, h, o);
 }
 
+// An object destroyed under the pointer (a rebuilt prompt, a closed dialog) never gets a pointerout, so it has to
+// hand the info box back itself; otherwise its stale tooltip would hide every later sector hover.
+export function releaseTipOnDestroy(scene, obj, isOver) {
+  obj.once('destroy', () => {
+    if (scene.sys?.isActive() && isOver()) scene.events.emit('tip', null);
+  });
+}
+
 export class Button extends Phaser.GameObjects.Container {
   constructor(scene, x, y, w, h, text, onClick, o = {}) {
     super(scene, x, y);
@@ -85,6 +93,7 @@ export class Button extends Phaser.GameObjects.Container {
       this.redraw();
       if (was && this.isEnabled) this.onClick?.(this);
     });
+    releaseTipOnDestroy(scene, this.hit, () => this.hover && this.tip);
     this.redraw();
     scene.add.existing(this);
   }
@@ -190,8 +199,16 @@ export function wait(scene, ms) {
 // Invisible interactive area that shows a tooltip in the info box while hovered. `tip` may be a function.
 export function hoverZone(scene, parent, x, y, w, h, tip) {
   const r = scene.add.rectangle(x + w / 2, y + h / 2, w, h, 0xffffff, 0.001).setInteractive();
-  r.on('pointerover', () => scene.events.emit('tip', typeof tip === 'function' ? tip() : tip));
-  r.on('pointerout', () => scene.events.emit('tip', null));
+  let over = false;
+  r.on('pointerover', () => {
+    over = true;
+    scene.events.emit('tip', typeof tip === 'function' ? tip() : tip);
+  });
+  r.on('pointerout', () => {
+    over = false;
+    scene.events.emit('tip', null);
+  });
+  releaseTipOnDestroy(scene, r, () => over);
   parent?.add(r);
   return r;
 }
