@@ -1,0 +1,24 @@
+{
+  "name": "eclipse-second-dawn",
+  "version": "1.0.0",
+  "description": "Eclipse: Second Dawn for the Galaxy - Phaser IO game",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "npx serve .",
+    "dev": "npx serve . -l 3000",
+    "build": "echo 'Build complete'"
+  },
+  "keywords": [
+    "phaser",
+    "eclipse",
+    "strategy"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.0"
+  },
+  "dependencies": {
+    "phaser": "^3.60.0"
+  }
+}
