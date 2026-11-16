@@ -9,7 +9,7 @@ const gameConfig = {
         mode: Phaser.Scale.RESIZE,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [],
+    scene: [BootScene, MenuScene, SetupScene, GameScene],
     physics: {
         default: 'arcade',
         arcade: {
